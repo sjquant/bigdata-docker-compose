@@ -21,6 +21,7 @@ services:
     restart: always
     volumes:
       - hadoop_datanode:/hadoop/dfs/data
+      - ./samples:/samples
     environment:
       SERVICE_PRECONDITION: "namenode:9870"
     env_file:
