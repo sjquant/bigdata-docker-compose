@@ -55,6 +55,13 @@ services:
       - hadoop_historyserver:/hadoop/yarn/timeline
     env_file:
       - ./hadoop.env
+
+  smartcar-loggen:
+    image: openjdk:18-jdk-slim-buster
+    container_name: smartcar-loggen
+    volumes:
+      - ./samples/CH2:/pilot-pjt
+    working_dir: /pilot-pjt
   
 volumes:
   hadoop_namenode:
