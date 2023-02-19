@@ -79,27 +79,27 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_BROKER_RACK: rack-1
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29091,PLAINTEXT_HOST://localhost:9091
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka:29091
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka:29092
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONTROL_CENTER_REPLICATION_FACTOR: 1
       CONFLUENT_SUPPORT_CUSTOMER_ID: "kafka"
       KAFKA_LOG_RETENTION_MS: 10000
       KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 5000
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
 
-  flume:
-    image: "bde2020/sc6-flume"
-    platform: linux/amd64 # for mac
+  flutent-bit:
+    image: fluent/fluent-bit:2.0.8
+    platform: linux/amd64  # for mac
+    restart: always
     depends_on:
-      - zookeeper
       - kafka
-    command: "bash -c /app/bin/flume-init"
     volumes:
-      - "./flume/flume.conf:/opt/flume-config/flume.conf"
-      - ./samples/CH2:/pilot-pjt
-    environment:
-      - FLUME_AGENT_NAME=SmartCar
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ./fluent-bit/logs:/pilot-pjt
+      - ./samples/CH2/driver-realtime-log:/pilot-pjt/realtime
   
 volumes:
   hadoop_namenode:
