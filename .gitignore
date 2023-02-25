@@ -1,5 +1,4 @@
 data/
 
-samples/CH2/SmartCar/*
-samples/CH2/driver-realtime-log/*
+samples/*
 !**/.gitkeep

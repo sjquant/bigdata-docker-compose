@@ -58,6 +58,7 @@ services:
 
   smartcar-loggen:
     image: openjdk:18-jdk-slim-buster
+    user: "1000:1000"
     container_name: smartcar-loggen
     volumes:
       - ./samples/CH2:/pilot-pjt
@@ -71,7 +72,7 @@ services:
       - 2181:2181
 
   kafka:
-    image: confluentinc/cp-server:6.0.1
+    image: confluentinc/cp-server:6.1.1
     platform: linux/amd64  # for mac
     restart: always
     depends_on:
@@ -89,17 +90,88 @@ services:
       KAFKA_LOG_RETENTION_MS: 10000
       KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 5000
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
 
-  flutent-bit:
+  init-kafka:
+    image: confluentinc/cp-kafka:6.1.1
+    depends_on:
+      - kafka
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server kafka:29092 --list
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic smartcar --replication-factor 1 --partitions 1
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka:29092 --list
+  
+  schema-registry:
+    image: confluentinc/cp-schema-registry:6.1.10
+    platform: linux/amd64  # for mac
+    depends_on:
+    - kafka        
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    restart: always
+
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:6.1.10
+    platform: linux/amd64  # for mac
+    restart: always
+    ports:
+      - 8083:8083
+    depends_on:
+      - kafka
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:29092
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: bigdata-study"
+      CONNECT_CONFIG_STORAGE_TOPIC: "bigdata-study-config"
+      CONNECT_OFFSET_STORAGE_TOPIC: "bigdata-study-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "bigdata-study-status"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_KEY_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "localhost"
+      CONNECT_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      CONNECTOR_PROPERTY_FILE_PREFIX: "sink-hdfs"
+    command:
+      - bash
+      - -c
+      - |
+        echo "Installing HDFS connector..."
+        confluent-hub install --no-prompt confluentinc/kafka-connect-hdfs:10.0.0
+        # Launch Kafka Connect worker
+        /etc/confluent/docker/run
+        # Don't exit
+        sleep infinity
+
+  fluent-bit:
     image: fluent/fluent-bit:2.0.8
+    user: "1000:1000"
     platform: linux/amd64  # for mac
     restart: always
     depends_on:
-      - kafka
+      - init-kafka
+      - kafka-connect
     volumes:
       - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
-      - ./fluent-bit/logs:/pilot-pjt
-      - ./samples/CH2/driver-realtime-log:/pilot-pjt/realtime
+      - ./fluent-bit/driver-realtime-log.conf:/fluent-bit/etc/driver-realtime-log.conf
+      - ./fluent-bit/smartcar.conf:/fluent-bit/etc/smartcar.conf
+      - ./samples/CH2:/pilot-pjt
   
 volumes:
   hadoop_namenode:
