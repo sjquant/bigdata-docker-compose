@@ -36,7 +36,7 @@ public class SmartCarDriverTopology {
 		StormTopology topology = makeTopology();
 
 		Map<String, String> HBaseConfig = Maps.newHashMap();
-		HBaseConfig.put("hbase.rootdir","hdfs://namenode:8020/hbase");
+		HBaseConfig.put("hbase.rootdir","hdfs://namenode:9000/hbase");
 
 		Config config = new Config();
 		config.setDebug(true);
